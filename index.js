@@ -218,25 +218,7 @@ client.on("message", function(message) {
 	  sendError("Calendar nickname not found",`${calenderNickName} was not found in "config.private.json"`);
 	  return;
    }
-   if(message.content.indexOf("test")==0){
-	   const exampleEmbed = new MessageEmbed()
-	.setColor('#0099ff')
-	.setTitle('[Gaming] Minecraft')
-	.setURL('https://discord.js.org/')
-	//.setAuthor('Calendar Manager', 'https://i.imgur.com/AfFp7pu.png', 'https://discord.js.org')
-	.setDescription('<t:1630429260:F>')
-	//.setThumbnail('https://i.imgur.com/AfFp7pu.png')
-	.addFields(
-		{ name: 'Calendar', value: 'Takanashi Kiara' },
-	)
-	.addField('URL', 'test', true)
-	//.setImage('https://i.imgur.com/AfFp7pu.png')
-	.setTimestamp()
-	.setFooter('Some footer text here', 'https://i.imgur.com/AfFp7pu.png');
-
-    message.channel.send({ embeds: [exampleEmbed] });
-	   
-   }
+   
    if(commands[0] == "c.list"){
 	   sendEvents(calenderNickName, message.channel);
    }
