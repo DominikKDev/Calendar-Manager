@@ -207,6 +207,8 @@ function getTimeFromDiscord(timeStr){
 client.on("message", function(message) { 
    if (message.author.bot) return;
    lastChannel=message.channel;
+   if(message.content.indexOf("c.")!==0) return;
+   
    let commands = message.content.split(" ");
     
    if(commands.length<1) return;
