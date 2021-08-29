@@ -30,7 +30,9 @@ Afterwards the config.private.json needs to be updated. This can look like the f
 After inviting the Bot to the Discord, this bot will react to following commands
 
 c.list <calendar nickname>
+
 c.add <calendar nickname> <timeformat in Hammertime> <url optional for location field> <summary of the event>
+
 c.update <calendar nickname> <internal select-id> <field> <content>
 
 TBD: Add a help command and more explanation... 
