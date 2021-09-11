@@ -1,5 +1,8 @@
 const { Client, Intents, MessageEmbed } = require('discord.js');
 const config = require("./config.private.json");
+const talents = require("./talents.json");
+const moment = require('moment-timezone');
+config.CALENDAR_ID=talents;
 
 const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
 let lastChannel={};                
@@ -118,7 +121,7 @@ function queryUpcomingEvents(calenderNickName,callback){
 			  console.log('Upcoming events:');
 			  events.map((event, i) => {
 				const start = event.start.dateTime || event.start.date;
-				console.log(event);
+				// console.log(event);
 				callback(start, event);
 		   
 		   
@@ -131,12 +134,12 @@ function queryUpcomingEvents(calenderNickName,callback){
 	if(!calenderNickName){
 		for(var key in config.CALENDAR_ID)
 		{
-		   var calId=config.CALENDAR_ID[key];
+		   var calId=config.CALENDAR_ID[key].id+config.CALENDAR_BASE;
 		   showCal(calId);
 		}
 	}else{
 		if(calenderNickName in config.CALENDAR_ID){
-			showCal(config.CALENDAR_ID[calenderNickName]);
+			showCal(config.CALENDAR_ID[calenderNickName].id+config.CALENDAR_BASE);
 		}else{
 			console.log(`No calender nick found for ${calenderNickName}`);
 			sendError("query calendar",`No calender nick found for ${calenderNickName}. Please look into "config.private.json"`);
@@ -155,12 +158,15 @@ function sendEvents(calenderNickName, channel, filterAction){
 	queryUpcomingEvents(calenderNickName,(start,event)=>{
 		   if(filterAction(internalId, event)){  
 		   
+		   let defaultColor='#0099ff';
+		   let unixTime=Math.floor(new Date(start).getTime() / 1000);
 		   const exampleEmbed = new MessageEmbed()
-			.setColor('#0099ff')
+			.setColor(talents[calenderNickName].colour ?? defaultColor)
 			.setTitle(event.summary)
 			//.setURL('https://discord.js.org/')
 			//.setAuthor('Calendar Manager', 'https://i.imgur.com/AfFp7pu.png', 'https://discord.js.org')
-			.setDescription("<t:"+Math.floor(new Date(start).getTime() / 1000)+":F>")
+			.setDescription("<t:"+unixTime+":F>\r\n\
+			JST: "+moment.unix(unixTime).tz("Asia/Tokyo").format("YYYY-MM-HH hh:mm"))
 			//.setThumbnail('https://i.imgur.com/AfFp7pu.png')
 			.addFields(
 				{ name: 'Calendar', value: event.organizer.displayName },
@@ -169,7 +175,7 @@ function sendEvents(calenderNickName, channel, filterAction){
 			.addField("Select-ID",(internalId)+"")
 			//.setImage('https://i.imgur.com/AfFp7pu.png')
 			.setTimestamp()
-			.setFooter('', 'https://i.imgur.com/AfFp7pu.png');
+			.setFooter('Calendar Manager - Bug reports to Dominik K', 'https://i.imgur.com/AfFp7pu.png');
 
 			channel.send({ embeds: [exampleEmbed] });
 		   }
@@ -188,23 +194,36 @@ function sendError(title, message){
 			//.setThumbnail('https://i.imgur.com/AfFp7pu.png')
 			//.setImage('https://i.imgur.com/AfFp7pu.png')
 			.setTimestamp()
-			.setFooter('Error-Message', 'https://i.imgur.com/AfFp7pu.png');
+			.setFooter('Error-Message  - Bug reports to Dominik K', 'https://i.imgur.com/AfFp7pu.png');
 
 			lastChannel.send({ embeds: [exampleEmbed] });
 }
 
-function getTimeFromDiscord(timeStr){
-	let regex=/<t:([0-9]+):.>/gm.exec(timeStr);
+function getTimeFromDiscord(timeArray){
+	if(timeArray[2].indexOf("<")==0)
+	{
+	   let timeStr=timeArray[2];
+	   console.log(timeStr);
+	   let regex=/<t:([0-9]+):.>/gm.exec(timeStr);
 	   if(!regex){
-		  sendError("Parsing Time",`"${commands[2]}" isn't a valid hammertime format. Use https://hammertime.djdavid98.art for a generator.`)
+		  sendError("Parsing Time",`"${timeStr}" isn't a valid hammertime format. Use https://hammertime.djdavid98.art for a generator.`)
 		  return;
 	   }
-	   return regex[1];
-	
+	   let discordTime=regex[1];
+	   return [new Date(parseInt(discordTime)*1000), new Date((parseInt(discordTime)+3600)*1000)];
+	}else{
+	   console.log(timeArray)
+	   let startTime=moment.tz(timeArray[2]+" "+timeArray[3],"YYYY-MM-DD HH:mm","Asia/Tokyo").utc().toDate();
+	   let endTime=moment.tz(timeArray[2]+" "+timeArray[3],"YYYY-MM-DD HH:mm","Asia/Tokyo").add(1, "hours").utc().toDate();
+	   let result=[startTime, endTime];
+	   console.log(result);
+	   return result;
+	}
 }
 
 
 client.on("message", function(message) { 
+try{
    if (message.author.bot) return;
    lastChannel=message.channel;
    if(message.content.indexOf("c.")!==0) return;
@@ -212,24 +231,55 @@ client.on("message", function(message) {
    let commands = message.content.split(" ");
     
    if(commands.length<1) return;
-   let calenderNickName=commands[1];
    
+   if(commands[0]=="c.help")
+   {
+		let defaultColor='#0099ff';
+		   
+		const helpEmbed = new MessageEmbed()
+		.setColor(defaultColor)
+		.setTitle("Calendar-Manager Help")
+		.setURL('https://github.com/DominikKDev/Calendar-Manager/wiki/Help')
+		//.setAuthor('Calendar Manager', 'https://i.imgur.com/AfFp7pu.png', 'https://discord.js.org')
+		.setDescription("General syntax: c.`command` `calendar` `params` \r\n\
+Calendar: "+Object.keys(talents).join(", ")+" \r\n\
+Commands: `list`, `add`,`update`, `delete`, `move` \r\n\
+`list` command and others will display a Select-ID, which is used by `update` and `delete` \r\n\
+The `add` command takes times in JST in the format YYYY-MM-DD hh:mm.\r\n\
+More infos in the linked URL in the title.\r\n\
+\r\n\
+Examples: \r\n\
+`c.add kiara 2022-11-18 20:55 https://some.optional.url [TEST] Anything after the optional url is the title` \r\n\
+`c.list mori` \r\n\
+`c.update ollie 5 cal collab` \r\n\
+`c.update anya 2 start 2022-11-18 17:55` \r\n\
+`c.update ina 2 url http://another.url`")
+		.setFooter('Help - Bug reports to Dominik K', '');
+
+		message.channel.send({ embeds: [helpEmbed] });
+		return;
+   }
+   
+   let calenderNickName=commands[1];
+   let internalUpdateId=0;
    // TODO error handling
-   let calendarID=config.CALENDAR_ID[calenderNickName];
-   if(!calendarID){
+   if(!(calenderNickName in config.CALENDAR_ID)){
 	  sendError("Calendar nickname not found",`${calenderNickName} was not found in "config.private.json"`);
 	  return;
    }
+   let calendarID=config.CALENDAR_ID[calenderNickName].id+config.CALENDAR_BASE;
+   
    
    if(commands[0] == "c.list"){
 	   sendEvents(calenderNickName, message.channel);
    }
    if(commands[0] =="c.add"){
-	   console.log(commands);
-	   let discordTime=getTimeFromDiscord(commands[2]);
-	   let startTime=new Date(parseInt(discordTime)*1000);
-	   let endTime=new Date((parseInt(discordTime)+3600)*1000);
-	   let rest= commands.slice(3);
+	   //console.log(commands);
+	   let times=getTimeFromDiscord(commands);
+	   let startTime=times[0]; // new Date(parseInt(discordTime)*1000);
+	   let endTime=times[1]; //new Date((parseInt(discordTime)+3600)*1000);
+	   // If it uses Hammertime then it's <
+	   let rest= commands.slice(commands.indexOf("<")==0?3:4);
 	   let location="";
 	   if(rest[0].indexOf("http")==0){
 		  location=rest[0];
@@ -247,13 +297,28 @@ client.on("message", function(message) {
 		   summary:summary,
 		   location:location
 	   }
+	   }, function(err, event) {
+		   console.log(err);
 	   });
 	   setTimeout(()=>sendEvents(calenderNickName, message.channel),1000);
    }
-   let internalUpdateId=0;
+   if(commands[0]=="c.delete")
+   {
+		let selectID=parseInt(commands[2]);
+		queryUpcomingEvents(calenderNickName, (start,event)=>{
+		  if(internalUpdateId==selectID){
+			 calendar.events.delete({
+			   calendarId:calendarID,
+			   eventId:event.id,
+			   auth:calAuth
+			 });
+		  }
+		  internalUpdateId++;
+		});
+		setTimeout(()=>sendEvents(calenderNickName, message.channel),1000);
+   }
    if(commands[0]=="c.update")
    {
-	  let calenderNickName=commands[1];
 	  let selectID=parseInt(commands[2]);
 	  let field=commands[3];
 	  let action=false;
@@ -265,7 +330,7 @@ client.on("message", function(message) {
 		 action=(event)=>event.summary=content;
 	  }
 	  else if(field=="cal"){
-		 let newCalendarID=config.CALENDAR_ID[content];
+		 let newCalendarID=config.CALENDAR_ID[content].id+config.CALENDAR_BASE;
 		 if(!newCalendarID){
 		     sendError("No calendar found",`Couldn't find calendar to move event to. Hint: No "${newCalendarID}" in config.private.json`);
 			 return;
@@ -278,14 +343,14 @@ client.on("message", function(message) {
 				   destination:newCalendarID
 			 });
 		 }
-		 setTimeout(()=>sendEvents(content, message.channel, (internalId, event)=>event.id==UpdatedEventId),1000);
+		 
 		 update=false;
 		 
 	  }
 	  else if(field=="start"){
-		  let discordTime=getTimeFromDiscord(commands[2]);
-	      let startTime=new Date(parseInt(discordTime)*1000);
-	      let endTime=new Date((parseInt(discordTime)+3600)*1000);
+		  let times=getTimeFromDiscord(commands);
+	      let startTime=times[0];//new Date(parseInt(discordTime)*1000);
+	      let endTime=times[1];//new Date((parseInt(discordTime)+3600)*1000);
 		  action=(event)=>{
 			  event.start=startTime;
 			  event.end=endTime;
@@ -318,8 +383,11 @@ client.on("message", function(message) {
 	    setTimeout(()=>sendEvents(calenderNickName, message.channel, (internalId, event)=>event.id==UpdatedEventId),1000);
 	 }
    }
+
    
-   console.log(message.content);   
+}catch(e){
+	console.log(e);   
+}
 });  
 
 client.login(config.BOT_TOKEN);
